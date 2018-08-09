@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: s2i-ocp-ansible-operations
+message: A new OCP Ansible playbook has been created in your project.
+metadata:
+  annotations:
+    openshift.io/display-name: OCP Ansible Playbook
+    tags: ansible,openshift
+    version: 1.0.0
+  name: s2i-ocp-ansible-operations
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      application: ${PLAYBOOK_NAME}
+    name: ${PLAYBOOK_NAME}
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      application: ${PLAYBOOK_NAME}
+    name: ${PLAYBOOK_NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${PLAYBOOK_NAME}:latest
+    source:
+      contextDir: ${CONTEXT_DIR}
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    strategy:
+      sourceStrategy:
+        forcePull: true
+        from:
+          kind: ImageStreamTag
+          name: ocp-ansible-operations:1.2
+          namespace: ${IMAGE_STREAM_NAMESPACE}
+      type: Source
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - generic:
+        secret: ${GENERIC_WEBHOOK_SECRET}
+      type: Generic
+    - imageChange: {}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    labels:
+      application: ${PLAYBOOK_NAME}
+    name: ${PLAYBOOK_NAME}
+  spec:
+    parallelism: 1
+    completions: 1
+    activeDeadlineSeconds: 1800
+    template:
+      metadata:
+        labels:
+          application: ${PLAYBOOK_NAME}
+          job: ${PLAYBOOK_NAME}
+        name: ${PLAYBOOK_NAME}
+      spec:
+        containers:
+        - env: []
+          image: ${PLAYBOOK_NAME}
+          imagePullPolicy: Always
+          name: ${PLAYBOOK_NAME}
+        restartPolicy: OnFailure
+parameters:
+- description: The name for the application.
+  displayName: Application Name
+  name: PLAYBOOK_NAME
+  required: true
+  value: ocp-ansible-operations-playbook
+- description: Git source URI for application
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/jboss-openshift/openshift-quickstarts
+- description: Git branch/tag reference
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+  value: master
+- description: GitHub trigger secret
+  displayName: Github Webhook Secret
+  from: '[a-zA-Z0-9]{8}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+  required: true
+- description: Generic build trigger secret
+  displayName: Generic Webhook Secret
+  from: '[a-zA-Z0-9]{8}'
+  generate: expression
+  name: GENERIC_WEBHOOK_SECRET
+  required: true
+- description: Namespace in which the ImageStreams for images are
+    installed. These ImageStreams are normally installed in the openshift namespace.
+    You should only need to modify this if you've installed the ImageStreams in a
+    different namespace/project.
+  displayName: ImageStream Namespace
+  name: IMAGE_STREAM_NAMESPACE
+  required: true
+  value: openshift

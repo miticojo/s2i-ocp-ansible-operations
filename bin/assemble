@@ -1,0 +1,22 @@
+#!/bin/bash -x
+set -o pipefail
+IFS=$'\n\t'
+
+source /usr/libexec/s2i/common.sh
+
+generate_passwd_file
+
+echo "---> Installing ansible files source..."
+cp -Rf /tmp/src/. ./
+
+if [ ! -e "${INVENTORY_NAME}" ]; then
+  echo "Inventory is missing at ${INVENTORY_NAME}"
+  exit 1
+fi
+
+if [ ! -e "${PLAYBOOK_NAME}" ]; then
+  echo "Playbook is missing at ${PLAYBOOK_NAME}"
+  exit 1
+fi
+
+ansible-playbook -vv --syntax-check -i ${INVENTORY_NAME} ${PLAYBOOK_NAME}
